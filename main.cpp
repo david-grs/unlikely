@@ -1,3 +1,5 @@
+#include "papi.h"
+
 #include <iostream>
 #include <array>
 #include <vector>
@@ -25,6 +27,31 @@ void pred(const std::array<unsigned char, 255>& v)
   BOOST_PP_REPEAT(255, DECL2, bla)
 }
 
+using icache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
+
+struct F
+{
+    template <typename F>
+    static void Call(F f, icache_profiler& p, int training)
+    {
+        using clock = std::chrono::high_resolution_clock;
+
+        for (int i = 0; i < training; ++i)
+            f();
+
+        p.start();
+        auto start = clock::now();
+        f();
+        auto end = clock::now();
+        p.stop();
+
+        std::cout << "time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << "ns" << std::endl;
+
+        const auto& counters = p.get_counters();
+        std::cout << "L1 ICM " << counters[0] << " - L2 ICM " << counters[1] << " - TLB IM " << counters[2] << std::endl;
+    }
+};
+
 int main(int argc, char **argv)
 {
     int training = 0;
@@ -34,29 +61,12 @@ int main(int argc, char **argv)
 
     std::array<unsigned char, 255> v{0};
 
-    using clock = std::chrono::high_resolution_clock;
+    icache_profiler p;
+    p.start();
+    p.stop();
 
-    {
-        for (int i = 0; i < training; ++i)
-            mispred(v);
-
-        auto start = clock::now();
-        mispred(v);
-        auto end = clock::now();
-
-        std::cout << "mispred: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << std::endl;
-    }
-
-    {
-        for (int i = 0; i < training; ++i)
-            pred(v);
-
-        auto start = clock::now();
-        pred(v);
-        auto end = clock::now();
-
-        std::cout << "pred: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << std::endl;
-    }
+    F::Call([&v]() { mispred(v); }, p, training);
+    F::Call([&v]() { pred(v); }, p, training);
 
     return 0;
 }
