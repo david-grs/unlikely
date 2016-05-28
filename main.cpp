@@ -28,12 +28,16 @@ void pred(const std::array<unsigned char, 255>& v)
 }
 
 using icache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
+using branch_profiler = papi_wrapper<PAPI_BR_CN, PAPI_BR_PRC, PAPI_BR_MSP>;
 
 struct F
 {
-    template <typename F>
-    static void Call(F f, icache_profiler& p, int training)
+    template <typename F, typename _ProfilerT>
+    static void Call(F f, _ProfilerT& p, int training)
     {
+        p.start();
+        p.stop();
+
         using clock = std::chrono::high_resolution_clock;
 
         for (int i = 0; i < training; ++i)
@@ -47,26 +51,42 @@ struct F
 
         std::cout << "time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << "ns" << std::endl;
 
-        const auto& counters = p.get_counters();
-        std::cout << "L1 ICM " << counters[0] << " - L2 ICM " << counters[1] << " - TLB IM " << counters[2] << std::endl;
+        for (int i = 0; i < _ProfilerT::events_count; ++i)
+            std::cout << _ProfilerT::get_event_name(i) << ": " << p.get_counter(i) << "  ";
+        std::cout << std::endl;
     }
 };
 
+int usage(char** argv)
+{
+    std::cerr << "usage: " << argv[0] << " <icache|branch> [training]" << std::endl;
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
-    int training = 0;
+    if (argc != 2 && argc != 3)
+        return usage(argv);
 
-    if (argc == 2)
-        training = std::atoi(argv[1]);
-
+    int training = argc == 3 ? std::atoi(argv[2]) : 0;
     std::array<unsigned char, 255> v{0};
 
-    icache_profiler p;
-    p.start();
-    p.stop();
-
-    F::Call([&v]() { mispred(v); }, p, training);
-    F::Call([&v]() { pred(v); }, p, training);
+    if (argv[1] == std::string("icache"))
+    {
+        icache_profiler p;
+        F::Call([&v]() { mispred(v); }, p, training);
+        F::Call([&v]() { pred(v); }, p, training);
+    }
+    else if (argv[1] == std::string("branch"))
+    {
+        branch_profiler p;
+        F::Call([&v]() { mispred(v); }, p, training);
+        F::Call([&v]() { pred(v); }, p, training);
+    }
+    else
+    {
+        return usage(argv);
+    }
 
     return 0;
 }
