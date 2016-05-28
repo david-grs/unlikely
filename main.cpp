@@ -35,8 +35,9 @@ struct F
     template <typename F, typename _ProfilerT>
     static void Call(F f, _ProfilerT& p, int training)
     {
-        p.start();
-        p.stop();
+        // this hack because on the first start() call, it seems that libpapi is doing some extra stuff and I saw a
+        // little bias in the measurements
+        p.start(); p.stop();
 
         using clock = std::chrono::high_resolution_clock;
 
