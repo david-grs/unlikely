@@ -5,26 +5,29 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <cstdlib>
 
 #include <boost/preprocessor/repetition/repeat.hpp>
 
 #define likely(x)      __builtin_expect(!!(x), 1)
 #define unlikely(x)    __builtin_expect(!!(x), 0)
 
-#define junk(n) std::vector<int> v ## n(200, n); std::cout << std::accumulate(std::begin(v ## n), std::end(v ## n), 1) << std::endl;
-
-//#define junk(n) std::cout << "foobar" << # n << std::endl;
+#define junk_small(n) std::exit(n); // 10 bytes of junk on x86-64
+#define junk_medium(n) std::cout << "foobar" << # n << std::endl; // ~100 bytes on x86-64
+#define junk_big(n) std::vector<int> v ## n(200, n); std::cout << std::accumulate(std::begin(v ## n), std::end(v ## n), 1) << std::endl; // ~250 bytes on x86-64
 
 void mispred(const std::array<unsigned char, 255>& v)
 {
-  #define DECL(z, n, text) if (__builtin_expect(v[n] > n, 1)) { junk(n) }
-  BOOST_PP_REPEAT(255, DECL, bla)
+    #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 1)) { junk_medium(n) }
+    BOOST_PP_REPEAT(255, CONDITION, bla)
+    #undef CONDITION
 }
 
 void pred(const std::array<unsigned char, 255>& v)
 {
-  #define DECL2(z, n, text) if (__builtin_expect(v[n] > n, 0)) { junk(n) }
-  BOOST_PP_REPEAT(255, DECL2, bla)
+    #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 0)) { junk_medium(n) }
+    BOOST_PP_REPEAT(255, CONDITION, bla)
+    #undef CONDITION
 }
 
 using icache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
