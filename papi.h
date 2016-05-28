@@ -75,16 +75,31 @@ struct papi_wrapper : public papi_wrapper_base
         return m_counters[_EventIndexT];
     }
 
+    long long get_counter(int i) const
+    {
+        return m_counters[i];
+    }
+
     template <int _EventIndexT>
     static constexpr int get_event_type()
     {
         return s_events[_EventIndexT];
     }
 
+    static constexpr int get_event_type(int i)
+    {
+        return s_events[i];
+    }
+
     template <int _EventIndexT>
     static const std::string& get_event_name()
     {
         return s_event_names[_EventIndexT];
+    }
+
+    static const std::string& get_event_name(int i)
+    {
+        return s_event_names[i];
     }
 
    private:
