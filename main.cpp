@@ -38,15 +38,14 @@ void not_taken_correct_hint(const std::array<unsigned char, 255>& v)
     #undef CONDITION
 }
 
-#define instr_small(n)  ++i;
-#define instr_medium(n) i *= n;
-#define instr_big(n)    i = (i + 1) * n; i = (int)std::round(i / std::sqrt(1 + v[n])); i = std::max(i, 1000);
+#define one_instr(n)  ++i;
+#define few_instrs(n) i = (i + 1) * n; i = (int)std::round(i / std::sqrt(1 + v[n])); i = std::max(i, 1000);
 
-#define instr instr_big
+#define instr few_instrs
 
 int taken_wrong_hint(const std::array<unsigned char, 255>& v)
 {
-    int i = std::rand();
+    int i = 1;
     #define CONDITION(z, n, text) if (__builtin_expect(v[n] <= n, 0)) { instr(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
@@ -55,7 +54,7 @@ int taken_wrong_hint(const std::array<unsigned char, 255>& v)
 
 int taken_no_hint(const std::array<unsigned char, 255>& v)
 {
-    int i = std::rand();
+    int i = 1;
     #define CONDITION(z, n, text) if (v[n] <= n) { instr(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
@@ -64,7 +63,7 @@ int taken_no_hint(const std::array<unsigned char, 255>& v)
 
 int taken_correct_hint(const std::array<unsigned char, 255>& v)
 {
-    int i = std::rand();
+    int i = 1;
     #define CONDITION(z, n, text) if (__builtin_expect(v[n] <= n, 1)) { instr(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
