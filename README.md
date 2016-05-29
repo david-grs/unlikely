@@ -37,7 +37,8 @@ The three numbers are the time in nanoseconds, for wrong hint, no hint and corre
 ```
 
 In order to see the effect of the *training* (same comment as above though):
-``
+
+```
 $ for i in `seq 0 1 10`; do ./unlikely not-taken $i; done
 4061;3822;4131
 1892;3979;2895
@@ -50,4 +51,4 @@ $ for i in `seq 0 1 10`; do ./unlikely not-taken $i; done
 1854;4015;1483
 1872;3941;1518
 1876;4152;1502
-``
+```
