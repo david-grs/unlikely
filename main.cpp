@@ -10,20 +10,17 @@
 
 #include <boost/preprocessor/repetition/repeat.hpp>
 
-#define likely(x)      __builtin_expect(!!(x), 1)
-#define unlikely(x)    __builtin_expect(!!(x), 0)
-
 #define junk_small(n)  std::exit(n); // 10 bytes of junk on x86-64
 #define junk_medium(n) std::cout << "foobar" << # n << std::endl; // ~100 bytes on x86-64
 #define junk_big(n)    std::vector<int> v ## n(200, n); std::cout << std::accumulate(std::begin(v ## n), std::end(v ## n), n) << std::endl; // ~250 bytes on x86-64
 
-#define junk junk_big
+#define junk junk_small
 
 std::array<unsigned char, 255> v{};
 
 void wrong_hint()
 {
-    #define CONDITION(z, n, text) if (likely(v[n] > n)) { junk(n) }
+    #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 1)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
@@ -37,7 +34,7 @@ void no_hint()
 
 void correct_hint()
 {
-    #define CONDITION(z, n, text) if (unlikely(v[n] > n)) { junk(n) }
+    #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 0)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
@@ -127,7 +124,7 @@ int main(int argc, char **argv)
         auto dur_nh = profile([]() { no_hint(); }, training);
         auto dur_ch = profile([]() { correct_hint(); }, training);
 
-        std::cout << dur_wh.count() << "," << dur_nh.count() << "," << dur_ch.count() << std::endl;
+        std::cout << dur_wh.count() << ";" << dur_nh.count() << ";" << dur_ch.count() << std::endl;
     }
     else if (hwd_counters == "cache")
         profile_papi<instr_profiler>(training);
