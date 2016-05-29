@@ -14,7 +14,7 @@
 #define junk_medium(n) std::cout << "foobar" << # n << std::endl; // ~100 bytes on x86-64
 #define junk_big(n)    std::vector<int> v ## n(200, n); std::cout << "foobar" << # n << std::accumulate(std::begin(v ## n), std::end(v ## n), n) << std::endl; // ~250 bytes on x86-64
 
-#define junk junk_big
+#define junk junk_small
 
 void wrong_hint(const std::array<unsigned char, 255>& v)
 {
@@ -37,7 +37,7 @@ void correct_hint(const std::array<unsigned char, 255>& v)
     #undef CONDITION
 }
 
-using icache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
+using cache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
 using branch_profiler = papi_wrapper<PAPI_BR_CN, PAPI_BR_PRC, PAPI_BR_MSP>;
 using instr_profiler = papi_wrapper<PAPI_TOT_CYC, PAPI_TOT_INS>;
 
@@ -126,9 +126,9 @@ int main(int argc, char **argv)
         std::cout << dur_wh.count() << ";" << dur_nh.count() << ";" << dur_ch.count() << std::endl;
     }
     else if (hwd_counters == "cache")
-        profile_papi<instr_profiler>(v, training);
+        profile_papi<cache_profiler>(v, training);
     else if (hwd_counters == "branch")
-        profile_papi<instr_profiler>(v, training);
+        profile_papi<branch_profiler>(v, training);
     else if (hwd_counters == "instr")
         profile_papi<instr_profiler>(v, training);
 
