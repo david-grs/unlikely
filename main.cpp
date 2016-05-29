@@ -51,18 +51,18 @@ struct F
     {
         // this hack because on the first start() call, it seems that libpapi is doing some extra stuff and I saw a
         // little bias in the measurements
-        p.start(); p.stop();
+        //p.start(); p.stop();
 
         using clock = std::chrono::high_resolution_clock;
 
         for (int i = 0; i < training; ++i)
             f();
 
-        p.start();
+        //p.start();
         auto start = clock::now();
         f();
         auto end = clock::now();
-        p.stop();
+       // p.stop();
 
         return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
     }
