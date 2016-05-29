@@ -47,7 +47,7 @@ using instr_profiler = papi_wrapper<PAPI_TOT_CYC, PAPI_TOT_INS>;
 struct F
 {
     template <typename F, typename _ProfilerT>
-    static void Call(F f, _ProfilerT& p, int training, const char* descr)
+    static std::chrono::nanoseconds Profile(F f, _ProfilerT& p, int training)
     {
         // this hack because on the first start() call, it seems that libpapi is doing some extra stuff and I saw a
         // little bias in the measurements
@@ -64,7 +64,13 @@ struct F
         auto end = clock::now();
         p.stop();
 
-        std::cout << std::left << std::setw(18) << descr << "time: " << std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() << "ns --- ";
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+    }
+
+    template <typename _ProfilerT>
+    static void Print(const char* descr, _ProfilerT& p, std::chrono::nanoseconds duration)
+    {
+        std::cout << std::left << std::setw(18) << descr << "time: " << duration.count() << "ns --- ";
 
         for (int i = 0; i < _ProfilerT::events_count; ++i)
             std::cout << _ProfilerT::get_event_name(i) << ": " << p.get_counter(i) << "  ";
@@ -88,9 +94,14 @@ int main(int argc, char **argv)
 
     auto bench = [&](auto& p)
     {
-        F::Call([&v]() { wrong_hint(v);   }, p, training, "wrong hint");
-        F::Call([&v]() { correct_hint(v); }, p, training, "correct hint");
-        F::Call([&v]() { no_hint(v);      }, p, training, "no hint");
+        auto duration = F::Profile([&v]() { wrong_hint(v);   }, p, training);
+        F::Print("wrong hint", p, duration);
+
+        duration = F::Profile([&v]() { correct_hint(v); }, p, training);
+        F::Print("correct hint", p, duration);
+
+        duration = F::Profile([&v]() { no_hint(v);      }, p, training);
+        F::Print("no hint", p, duration);
     };
 
     if (argv[1] == std::string("icache"))
