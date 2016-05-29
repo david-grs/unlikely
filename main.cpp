@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iomanip>
+#include <cassert>
 
 #include <boost/preprocessor/repetition/repeat.hpp>
 
@@ -39,7 +40,7 @@ void not_taken_correct_hint(const std::array<unsigned char, 255>& v)
 
 #define instr_small(n)  ++i;
 #define instr_medium(n) i *= n;
-#define instr_big(n) i = (i + 1) * n; i = (int)std::round(i / std::sqrt(1 + v[n])); i = std::max(i, 1000);
+#define instr_big(n)    i = (i + 1) * n; i = (int)std::round(i / std::sqrt(1 + v[n])); i = std::max(i, 1000);
 
 #define instr instr_big
 
@@ -70,9 +71,20 @@ int taken_correct_hint(const std::array<unsigned char, 255>& v)
     return i;
 }
 
-using cache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
-using branch_profiler = papi_wrapper<PAPI_BR_CN, PAPI_BR_PRC, PAPI_BR_MSP>;
-using instr_profiler = papi_wrapper<PAPI_TOT_CYC, PAPI_TOT_INS>;
+template <typename F>
+std::chrono::nanoseconds profile(F f, int training)
+{
+    using clock = std::chrono::high_resolution_clock;
+
+    for (int i = 0; i < training; ++i)
+        f();
+
+    auto start = clock::now();
+    f();
+    auto end = clock::now();
+
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+}
 
 template <typename F, typename _ProfilerT>
 std::chrono::nanoseconds profile(F f, _ProfilerT& p, int training)
@@ -91,21 +103,6 @@ std::chrono::nanoseconds profile(F f, _ProfilerT& p, int training)
     return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 }
 
-template <typename F>
-std::chrono::nanoseconds profile(F f, int training)
-{
-    using clock = std::chrono::high_resolution_clock;
-
-    for (int i = 0; i < training; ++i)
-        f();
-
-    auto start = clock::now();
-    f();
-    auto end = clock::now();
-
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-}
-
 template <typename _ProfilerT>
 void print_papi(const char* descr, _ProfilerT& p, std::chrono::nanoseconds duration)
 {
@@ -117,21 +114,36 @@ void print_papi(const char* descr, _ProfilerT& p, std::chrono::nanoseconds durat
 }
 
 template <typename _ProfilerT>
-void profile_papi(const std::array<unsigned char, 255>& v, int training)
+void profile_papi(const std::array<unsigned char, 255>& v, bool taken, int training)
 {
     _ProfilerT p;
 
-    // this hack because on the first start() call, it seems that libpapi is doing some init and measurements are biased
+    // this hack because on the first start() call, it seems that libpapi is doing some initialization and I got
+    // weird results / jitter for the first measurement without that line
     p.start(); p.stop();
 
-    auto duration = profile([&v]() { not_taken_wrong_hint(v); }, p, training);
-    print_papi("wrong hint", p, duration);
+    if (taken)
+    {
+        auto duration = profile([&v]() { taken_wrong_hint(v); }, p, training);
+        print_papi("wrong hint", p, duration);
 
-    duration = profile([&v]() { not_taken_no_hint(v); }, p, training);
-    print_papi("no hint", p, duration);
+        duration = profile([&v]() { taken_no_hint(v); }, p, training);
+        print_papi("no hint", p, duration);
 
-    duration = profile([&v]() { not_taken_correct_hint(v); }, p, training);
-    print_papi("correct hint", p, duration);
+        duration = profile([&v]() { taken_correct_hint(v); }, p, training);
+        print_papi("correct hint", p, duration);
+    }
+    else
+    {
+        auto duration = profile([&v]() { not_taken_wrong_hint(v); }, p, training);
+        print_papi("wrong hint", p, duration);
+
+        duration = profile([&v]() { not_taken_no_hint(v); }, p, training);
+        print_papi("no hint", p, duration);
+
+        duration = profile([&v]() { not_taken_correct_hint(v); }, p, training);
+        print_papi("correct hint", p, duration);
+    }
 };
 
 int usage(char** argv)
@@ -170,12 +182,21 @@ int main(int argc, char **argv)
 
         std::cout << dur_wh.count() << ";" << dur_nh.count() << ";" << dur_ch.count() << std::endl;
     }
-    else if (hwd_counters == "cache")
-        profile_papi<cache_profiler>(v, training);
-    else if (hwd_counters == "branch")
-        profile_papi<branch_profiler>(v, training);
-    else if (hwd_counters == "instr")
-        profile_papi<instr_profiler>(v, training);
+    else
+    {
+        using cache_profiler  = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
+        using branch_profiler = papi_wrapper<PAPI_BR_CN, PAPI_BR_PRC, PAPI_BR_MSP>;
+        using instr_profiler  = papi_wrapper<PAPI_TOT_CYC, PAPI_TOT_INS>;
+
+        if (hwd_counters == "cache")
+            profile_papi<cache_profiler>(v, taken, training);
+        else if (hwd_counters == "branch")
+            profile_papi<branch_profiler>(v, taken, training);
+        else if (hwd_counters == "instr")
+            profile_papi<instr_profiler>(v, taken, training);
+        else
+            assert(false);
+    }
 
     return 0;
 }
