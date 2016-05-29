@@ -16,25 +16,58 @@
 
 #define junk junk_small
 
-void wrong_hint(const std::array<unsigned char, 255>& v)
+void not_taken_wrong_hint(const std::array<unsigned char, 255>& v)
 {
     #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 1)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
 
-void no_hint(const std::array<unsigned char, 255>& v)
+void not_taken_no_hint(const std::array<unsigned char, 255>& v)
 {
     #define CONDITION(z, n, text) if (v[n] > n) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
 
-void correct_hint(const std::array<unsigned char, 255>& v)
+void not_taken_correct_hint(const std::array<unsigned char, 255>& v)
 {
     #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 0)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
+}
+
+#define instr_small(n)  ++i;
+#define instr_medium(n) i *= n;
+#define instr_big(n) i = (i + 1) * n; i = (int)std::round(i / std::sqrt(1 + v[n])); i = std::max(i, 1000);
+
+#define instr instr_big
+
+int taken_wrong_hint(const std::array<unsigned char, 255>& v)
+{
+    int i = std::rand();
+    #define CONDITION(z, n, text) if (__builtin_expect(v[n] <= n, 0)) { instr(n) }
+    BOOST_PP_REPEAT(255, CONDITION, bla)
+    #undef CONDITION
+    return i;
+}
+
+int taken_no_hint(const std::array<unsigned char, 255>& v)
+{
+    int i = std::rand();
+    #define CONDITION(z, n, text) if (v[n] <= n) { instr(n) }
+    BOOST_PP_REPEAT(255, CONDITION, bla)
+    #undef CONDITION
+    return i;
+}
+
+int taken_correct_hint(const std::array<unsigned char, 255>& v)
+{
+    int i = std::rand();
+    #define CONDITION(z, n, text) if (__builtin_expect(v[n] <= n, 1)) { instr(n) }
+    BOOST_PP_REPEAT(255, CONDITION, bla)
+    #undef CONDITION
+    return i;
 }
 
 using cache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
@@ -91,37 +124,49 @@ void profile_papi(const std::array<unsigned char, 255>& v, int training)
     // this hack because on the first start() call, it seems that libpapi is doing some init and measurements are biased
     p.start(); p.stop();
 
-    auto duration = profile([&v]() { wrong_hint(v); }, p, training);
+    auto duration = profile([&v]() { not_taken_wrong_hint(v); }, p, training);
     print_papi("wrong hint", p, duration);
 
-    duration = profile([&v]() { no_hint(v); }, p, training);
+    duration = profile([&v]() { not_taken_no_hint(v); }, p, training);
     print_papi("no hint", p, duration);
 
-    duration = profile([&v]() { correct_hint(v); }, p, training);
+    duration = profile([&v]() { not_taken_correct_hint(v); }, p, training);
     print_papi("correct hint", p, duration);
 };
 
 int usage(char** argv)
 {
-    std::cerr << "usage: " << argv[0] << " training [cache|branch|instr]" << std::endl;
+    std::cerr << "usage: " << argv[0] << " taken|not-taken training [cache|branch|instr]" << std::endl;
     return 1;
 }
 
 int main(int argc, char **argv)
 {
-    if (argc != 2 && argc != 3)
+    if ((argc != 3 && argc != 4) || (argv[1] != std::string("taken") && argv[1] != std::string("not-taken")))
         return usage(argv);
 
-    int training = std::atoi(argv[1]);
-    std::string hwd_counters = argc == 3 ? argv[2] : "";
+    const bool taken = argv[1] == std::string("taken");
+    const int training = std::atoi(argv[2]);
+    const std::string hwd_counters = argc == 4 ? argv[3] : "";
 
     std::array<unsigned char, 255> v{};
 
     if (hwd_counters.empty())
     {
-        auto dur_wh = profile([&v]() { wrong_hint(v); }, training);
-        auto dur_nh = profile([&v]() { no_hint(v); }, training);
-        auto dur_ch = profile([&v]() { correct_hint(v); }, training);
+        std::chrono::nanoseconds dur_wh, dur_nh, dur_ch;
+
+        if (taken)
+        {
+            dur_wh = profile([&v]() { taken_wrong_hint(v); }, training);
+            dur_nh = profile([&v]() { taken_no_hint(v); }, training);
+            dur_ch = profile([&v]() { taken_correct_hint(v); }, training);
+        }
+        else
+        {
+            dur_wh = profile([&v]() { not_taken_wrong_hint(v); }, training);
+            dur_nh = profile([&v]() { not_taken_no_hint(v); }, training);
+            dur_ch = profile([&v]() { not_taken_correct_hint(v); }, training);
+        }
 
         std::cout << dur_wh.count() << ";" << dur_nh.count() << ";" << dur_ch.count() << std::endl;
     }
