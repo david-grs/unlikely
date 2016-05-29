@@ -126,7 +126,4 @@ template <int... _EventsT>
 const std::array<std::string, papi_wrapper<_EventsT...>::events_count> papi_wrapper<_EventsT...>::s_event_names =
     get_papi_event_names(papi_wrapper<_EventsT...>::s_events);
 
-typedef papi_wrapper<PAPI_L1_DCM, PAPI_L2_DCM, PAPI_L3_TCM> cache_profiler;
-typedef papi_wrapper<PAPI_TOT_INS, PAPI_TOT_CYC, PAPI_BR_MSP> instr_profiler;
-
 }
