@@ -97,14 +97,14 @@ int main(int argc, char **argv)
         auto dur_wh = F::Profile([&v]() { wrong_hint(v); }, p, training);
         //F::Print("wrong hint", p, dur_wh);
 
-        auto dur_ch = F::Profile([&v]() { correct_hint(v); }, p, training);
-        //F::Print("correct hint", p, dur_ch);
-
         auto dur_nh = F::Profile([&v]() { no_hint(v); }, p, training);
         //F::Print("no hint", p, dur_nh);
 
+        auto dur_ch = F::Profile([&v]() { correct_hint(v); }, p, training);
+        //F::Print("correct hint", p, dur_ch);
+
         // CSV style reporting for graph
-        std::cout << dur_wh.count() << "," << dur_ch.count() << "," << dur_nh.count() << std::endl;
+        std::cout << dur_wh.count() << "," << dur_nh.count() << "," << dur_ch.count() << std::endl;
     };
 
     if (argv[1] == std::string("icache"))
