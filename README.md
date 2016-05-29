@@ -32,14 +32,14 @@ This run the test on non-taken condition jumps, without any previous *training* 
 The three numbers are the time in nanoseconds, for wrong hint, no hint and correct hint.
 
 ```
-./unlikely not-taken 0
+./hint not-taken 0
 4061;3822;4131
 ```
 
 In order to see the effect of the *training* (same comment as above though):
 
 ```
-$ for i in `seq 0 1 10`; do ./unlikely not-taken $i; done
+$ for i in `seq 0 1 10`; do ./hint not-taken $i; done
 4061;3822;4131
 1892;3979;2895
 1983;3961;1534
