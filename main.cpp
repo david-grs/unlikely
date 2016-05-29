@@ -23,14 +23,7 @@ std::array<unsigned char, 255> v{};
 
 void wrong_hint()
 {
-    #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 1)) { junk(n) }
-    BOOST_PP_REPEAT(255, CONDITION, bla)
-    #undef CONDITION
-}
-
-void correct_hint()
-{
-    #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 0)) { junk(n) }
+    #define CONDITION(z, n, text) if (likely(v[n] > n)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
@@ -42,6 +35,13 @@ void no_hint()
     #undef CONDITION
 }
 
+void correct_hint()
+{
+    #define CONDITION(z, n, text) if (unlikely(v[n] > n)) { junk(n) }
+    BOOST_PP_REPEAT(255, CONDITION, bla)
+    #undef CONDITION
+}
+
 using icache_profiler = papi_wrapper<PAPI_L1_ICM, PAPI_L2_ICM, PAPI_TLB_IM>;
 using branch_profiler = papi_wrapper<PAPI_BR_CN, PAPI_BR_PRC, PAPI_BR_MSP>;
 using instr_profiler = papi_wrapper<PAPI_TOT_CYC, PAPI_TOT_INS>;
@@ -49,10 +49,6 @@ using instr_profiler = papi_wrapper<PAPI_TOT_CYC, PAPI_TOT_INS>;
 template <typename F, typename _ProfilerT>
 std::chrono::nanoseconds profile(F f, _ProfilerT& p, int training)
 {
-    // this hack because on the first start() call, it seems that libpapi is doing some extra stuff and I saw a
-    // little bias in the measurements
-    p.start(); p.stop();
-
     using clock = std::chrono::high_resolution_clock;
 
     for (int i = 0; i < training; ++i)
@@ -96,6 +92,9 @@ template <typename _ProfilerT>
 void profile_papi(int training)
 {
     _ProfilerT p;
+
+    // this hack because on the first start() call, it seems that libpapi is doing some init and measurements are biased
+    p.start(); p.stop();
 
     auto duration = profile([]() { wrong_hint(); }, p, training);
     print_papi("wrong hint", p, duration);
