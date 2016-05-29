@@ -12,27 +12,25 @@
 
 #define junk_small(n)  std::exit(n); // 10 bytes of junk on x86-64
 #define junk_medium(n) std::cout << "foobar" << # n << std::endl; // ~100 bytes on x86-64
-#define junk_big(n)    std::vector<int> v ## n(200, n); std::cout << std::accumulate(std::begin(v ## n), std::end(v ## n), n) << std::endl; // ~250 bytes on x86-64
+#define junk_big(n)    std::vector<int> v ## n(200, n); std::cout << "foobar" << # n << std::accumulate(std::begin(v ## n), std::end(v ## n), n) << std::endl; // ~250 bytes on x86-64
 
-#define junk junk_small
+#define junk junk_big
 
-std::array<unsigned char, 255> v{};
-
-void wrong_hint()
+void wrong_hint(const std::array<unsigned char, 255>& v)
 {
     #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 1)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
 
-void no_hint()
+void no_hint(const std::array<unsigned char, 255>& v)
 {
     #define CONDITION(z, n, text) if (v[n] > n) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
     #undef CONDITION
 }
 
-void correct_hint()
+void correct_hint(const std::array<unsigned char, 255>& v)
 {
     #define CONDITION(z, n, text) if (__builtin_expect(v[n] > n, 0)) { junk(n) }
     BOOST_PP_REPEAT(255, CONDITION, bla)
@@ -86,20 +84,20 @@ void print_papi(const char* descr, _ProfilerT& p, std::chrono::nanoseconds durat
 }
 
 template <typename _ProfilerT>
-void profile_papi(int training)
+void profile_papi(const std::array<unsigned char, 255>& v, int training)
 {
     _ProfilerT p;
 
     // this hack because on the first start() call, it seems that libpapi is doing some init and measurements are biased
     p.start(); p.stop();
 
-    auto duration = profile([]() { wrong_hint(); }, p, training);
+    auto duration = profile([&v]() { wrong_hint(v); }, p, training);
     print_papi("wrong hint", p, duration);
 
-    duration = profile([]() { no_hint(); }, p, training);
+    duration = profile([&v]() { no_hint(v); }, p, training);
     print_papi("no hint", p, duration);
 
-    duration = profile([]() { correct_hint(); }, p, training);
+    duration = profile([&v]() { correct_hint(v); }, p, training);
     print_papi("correct hint", p, duration);
 };
 
@@ -117,21 +115,22 @@ int main(int argc, char **argv)
     int training = std::atoi(argv[1]);
     std::string hwd_counters = argc == 3 ? argv[2] : "";
 
+    std::array<unsigned char, 255> v{};
 
     if (hwd_counters.empty())
     {
-        auto dur_wh = profile([]() { wrong_hint(); }, training);
-        auto dur_nh = profile([]() { no_hint(); }, training);
-        auto dur_ch = profile([]() { correct_hint(); }, training);
+        auto dur_wh = profile([&v]() { wrong_hint(v); }, training);
+        auto dur_nh = profile([&v]() { no_hint(v); }, training);
+        auto dur_ch = profile([&v]() { correct_hint(v); }, training);
 
         std::cout << dur_wh.count() << ";" << dur_nh.count() << ";" << dur_ch.count() << std::endl;
     }
     else if (hwd_counters == "cache")
-        profile_papi<instr_profiler>(training);
+        profile_papi<instr_profiler>(v, training);
     else if (hwd_counters == "branch")
-        profile_papi<instr_profiler>(training);
+        profile_papi<instr_profiler>(v, training);
     else if (hwd_counters == "instr")
-        profile_papi<instr_profiler>(training);
+        profile_papi<instr_profiler>(v, training);
 
     return 0;
 }
