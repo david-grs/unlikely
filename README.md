@@ -1,4 +1,4 @@
-The code here is measuring the effect of a good, bad or non usage of the likely/unlikely hints. 
+This code aims to measure the effect of a good, bad or non usage of the likely/unlikely hints. 
 
 
 Results
