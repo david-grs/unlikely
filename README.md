@@ -29,7 +29,7 @@ but the jumps...
 Example of usage
 ================
 This run the test on non-taken condition jumps, without any previous *training* of the branch predictor. 
-The three numbers are the time in nanoseconds, for wrong hint, no hint and correct hint.
+The output is the time, in nanoseconds, for wrong hint, no hint and correct hint.
 
 ```
 ./hint not-taken 0
