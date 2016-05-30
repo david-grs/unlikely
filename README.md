@@ -7,7 +7,7 @@ Results
 
 Environment:
  - CPU Ivy Bridge i7-3537U
- - Binary built wih GCC 5.3.0 in release mode
+ - GCC 5.3.0 - Release mode
  - Linux 3.13.0
 
 
